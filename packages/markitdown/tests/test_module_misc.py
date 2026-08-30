@@ -3,6 +3,7 @@ import io
 import os
 import re
 import shutil
+import zipfile
 import pytest
 from unittest.mock import MagicMock
 
@@ -272,6 +273,31 @@ def test_docx_equations() -> None:
     # Find block equations wrapped with double $$ and check if they are present
     block_equations = re.findall(r"\$\$(.+?)\$\$", result.text_content)
     assert block_equations, "No block equations found in the document."
+
+
+def test_docx_double_strikethrough() -> None:
+    markitdown = MarkItDown()
+    docx = io.BytesIO()
+    with zipfile.ZipFile(
+        os.path.join(TEST_FILES_DIR, "test.docx")
+    ) as source, zipfile.ZipFile(docx, "w") as target:
+        for entry in source.infolist():
+            content = source.read(entry.filename)
+            if entry.filename == "word/document.xml":
+                run = (
+                    b"<w:p><w:r><w:rPr><w:dstrike/></w:rPr>"
+                    b"<w:t>double strike marker</w:t></w:r></w:p>"
+                    b'<w:p><w:r><w:rPr><w:dstrike w:val="0"/></w:rPr>'
+                    b"<w:t>disabled double strike marker</w:t></w:r></w:p>"
+                )
+                content = content.replace(b"</w:body>", run + b"</w:body>")
+            target.writestr(entry, content)
+
+    docx.seek(0)
+    result = markitdown.convert_stream(docx, file_extension=".docx")
+    assert "~~double strike marker~~" in result.text_content
+    assert "disabled double strike marker" in result.text_content
+    assert "~~disabled double strike marker~~" not in result.text_content
 
 
 def test_input_as_strings() -> None:

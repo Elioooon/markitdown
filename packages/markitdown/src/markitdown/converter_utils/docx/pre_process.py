@@ -96,9 +96,9 @@ def _replace_equations(tag: Tag):
         raise ValueError(f"Not supported tag: {tag.name}")
 
 
-def _pre_process_math(content: bytes) -> bytes:
+def _pre_process_document_xml(content: bytes) -> bytes:
     """
-    Pre-processes the math content in a DOCX -> XML file by converting OMML (Office Math Markup Language) elements to LaTeX.
+    Pre-processes DOCX XML by preserving equations and double-strikethrough runs.
     This preprocessed content can be directly replaced in the DOCX file -> XMLs.
 
     Args:
@@ -112,6 +112,8 @@ def _pre_process_math(content: bytes) -> bytes:
         _replace_equations(tag)
     for tag in soup.find_all("oMath"):
         _replace_equations(tag)
+    for tag in soup.find_all("dstrike"):
+        tag.name = "strike"
     return str(soup).encode()
 
 
@@ -144,7 +146,7 @@ def pre_process_docx(input_docx: BinaryIO) -> BinaryIO:
                 if name in pre_process_enable_files:
                     try:
                         # Pre-process the content
-                        updated_content = _pre_process_math(content)
+                        updated_content = _pre_process_document_xml(content)
                         # In the future, if there are more pre-processing steps, they can be added here
                         zip_output.writestr(name, updated_content)
                     except Exception:
